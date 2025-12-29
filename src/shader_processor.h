@@ -1,20 +1,23 @@
 #ifndef SHADER_PROCESSOR_H_
 #define SHADER_PROCESSOR_H_
 
-#include <codecvt>
 #include <filesystem>
+#include <functional>
 #include <iostream>
-#include <locale>
-#include <sstream>
 #include <string>
 #include <vector>
 
-namespace shader::processor::internal {
+namespace shader::processor {
+
 /// Logger
-void (*log)(const std::string&) = [](const std::string& msg) {
-  std::cout << msg << std::endl;
+///
+/// Default log lambda is marked with '+' ensuring no capture
+/// Same overhead as a function pointer
+inline std::function<void(std::string_view)> log = +[](std::string_view msg) {
+  std::cout << msg << '\n';
 };
 
+namespace internal {
 /// Enum for shader type
 enum class ShaderFileType { Unknown, Vertex, Fragment };
 
@@ -24,11 +27,11 @@ enum class ShaderFileType { Unknown, Vertex, Fragment };
 /// @return WString of shader type
 inline std::wstring shaderTypeToWString(ShaderFileType type) {
   switch (type) {
-    case shader::processor::internal::ShaderFileType::Unknown:
+    case ShaderFileType::Unknown:
       return L"unknown";
-    case shader::processor::internal::ShaderFileType::Vertex:
+    case ShaderFileType::Vertex:
       return L"vertex";
-    case shader::processor::internal::ShaderFileType::Fragment:
+    case ShaderFileType::Fragment:
       return L"fragment";
     default:
       return L"unknown";
@@ -74,9 +77,7 @@ inline bool runProcess(const std::wstring& exec_file,
   return true;
 }
 
-}  // namespace shader::processor::internal
-
-namespace shader::processor {
+}  // namespace internal
 
 /// Finds all regular files under the given directory path.
 ///
@@ -170,13 +171,25 @@ inline void processShaders(const std::vector<std::filesystem::path>& files,
     }
 
     // log discovered shader file
-    si::log("Discovered shader file : " + file.generic_string());
+    log("Discovered shader file : " + file.generic_string());
 
     // setup input and output file paths
     fs::path input_file = fs::absolute(file);
     fs::path output_file = fs::absolute(shader_bin_dir / file.filename());
     // replace .sc with .bin
     output_file.replace_extension(".bin");
+
+    // Check if file already exists and its time stamp
+    if (fs::exists(output_file)) {
+      const auto source_timestamp = fs::last_write_time(input_file);
+      const auto binary_timestamp = fs::last_write_time(output_file);
+
+      // Skip processing file if binary is newer than source
+      if (binary_timestamp > source_timestamp) {
+        log("Skipping file : " + input_file.generic_string());
+        continue;
+      }
+    }
 
     // wstring version of shader type
     std::wstring shader_type_wstr = si::shaderTypeToWString(shader_type);
@@ -195,7 +208,7 @@ inline void processShaders(const std::vector<std::filesystem::path>& files,
       const std::string success_msg =
           "Successfuly processed shader : " + output_file.generic_string();
 
-      si::log(success_msg);
+      log(success_msg);
     }
   }
 }
