@@ -38,12 +38,11 @@ inline std::wstring shaderTypeToWString(ShaderFileType type) {
   }
 }
 
-/// <summary>
+/// Creates a `shaderc` process with arugments
 ///
-/// </summary>
-/// <param name="exec_file"></param>
-/// <param name="args"></param>
-/// <returns></returns>
+/// @param exec_file path to the shaderc executeable
+/// @param args arguments with which the program will execute, source and output along with other flags
+/// @return True is process was created successfully, false otherwise
 inline bool runProcess(const std::wstring& exec_file,
                        const std::wstring& args) {
   STARTUPINFOW si{};
@@ -113,11 +112,13 @@ inline std::vector<std::filesystem::path> findShaderFiles(
   return out_files;
 }
 
-/// <summary>
+/// Stems the file extension and detects the type of shader based on filename
 ///
-/// </summary>
-/// <param name="file"></param>
-/// <returns></returns>
+/// .vs for Vertex shader and .fs for Fragment shader
+/// .gs for geometry shader and .ts tessellation shader 
+/// 
+/// @param file path to shader file
+/// @return Enum of `ShaderFileType`
 inline internal::ShaderFileType detectShaderFileType(
     const std::filesystem::path& file) {
 
@@ -133,17 +134,20 @@ inline internal::ShaderFileType detectShaderFileType(
   return internal::ShaderFileType::Unknown;
 }
 
-/// <summary>
+/// Processes the shader from their raw .sc form to .bin format
 ///
-/// </summary>
-/// <param name="files"></param>
-/// <param name="shader_source_dir"></param>
-/// <param name="shader_bin_dir"></param>
-/// <param name="shader_tool_dir"></param>
+/// Internally creates windows process to run `shaderc` program and process the shaders into binary
+/// 
+/// @param files A vector of file paths to process
+/// @param shader_bin_dir output directory where binary shaders will be placed
+/// @param shader_tool_dir directory where `shaderc.exe` lives along side bgfx_shader.sh and varying.def.sc
+/// @param platform_name Name of platform (windows, linux, osx, etc)
+/// @param profile_name (vs_5_0, 120, ps_5_0, glsl, spirv, etc)
 inline void processShaders(const std::vector<std::filesystem::path>& files,
-                           const std::filesystem::path& shader_source_dir,
                            const std::filesystem::path& shader_bin_dir,
-                           const std::filesystem::path& shader_tool_dir) {
+                           const std::filesystem::path& shader_tool_dir,
+                           const std::wstring& platform_name,
+                           const std::wstring& profile_name) {
 
   namespace fs = std::filesystem;
   namespace si = internal;
@@ -186,7 +190,7 @@ inline void processShaders(const std::vector<std::filesystem::path>& files,
 
       // Skip processing file if binary is newer than source
       if (binary_timestamp > source_timestamp) {
-        log("Skipping file : " + input_file.generic_string());
+        log("Skipping unchanged file : " + input_file.generic_string());
         continue;
       }
     }
@@ -198,7 +202,8 @@ inline void processShaders(const std::vector<std::filesystem::path>& files,
     std::wstringstream command;
     command << L"-f \"" << input_file.wstring() << L"\" " << L"-o \""
             << output_file.wstring() << L"\" " << L"--type " << shader_type_wstr
-            << L" " << L"--platform windows " << L"--profile 120 " << L"-i \""
+            << L" " << L"--platform " << platform_name << L" " << L"--profile "
+            << profile_name << L" " << L"-i \""
             << fs::absolute(shader_tool_dir).wstring() << L"\" "
             << L"--varyingdef \"" << varying_file_path.wstring() << L"\"";
 

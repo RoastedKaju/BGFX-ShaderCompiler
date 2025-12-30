@@ -180,8 +180,8 @@ int main()
 	
 	const auto& files = shader::processor::findShaderFiles(std::filesystem::path(SHADER_ROOT_PATH));
 
-	shader::processor::processShaders(files, SHADER_ROOT_PATH, SHADER_BIN_PATH,
-                                  SHADER_TOOL_PATH);
+	shader::processor::processShaders(files, SHADER_BIN_PATH,
+                                      SHADER_TOOL_PATH, L"windows", L"120");
 
 	bgfx::shutdown();
 
